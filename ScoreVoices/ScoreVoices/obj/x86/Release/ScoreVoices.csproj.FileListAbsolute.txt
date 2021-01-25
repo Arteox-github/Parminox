@@ -1,0 +1,16 @@
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Release\sqlite3.dll
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Release\Parminox.exe.config
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Release\Parminox.exe
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Release\Parminox.pdb
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Release\System.Data.SQLite.dll
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Release\System.Data.SQLite.xml
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Release\System.Data.SQLite.dll.config
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.LibraryForm.resources
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.MF.resources
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.Properties.Resources.resources
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.WorksForm.resources
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVoices.csproj.GenerateResource.cache
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVoices.csproj.CoreCompileInputs.cache
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVoices.csproj.CopyComplete
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.exe
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.pdb

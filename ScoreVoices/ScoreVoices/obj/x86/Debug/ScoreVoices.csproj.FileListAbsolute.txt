@@ -1,0 +1,16 @@
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Debug\sqlite3.dll
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Debug\Parminox.exe.config
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Debug\Parminox.exe
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Debug\Parminox.pdb
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Debug\System.Data.SQLite.dll
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Debug\System.Data.SQLite.xml
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\bin\Debug\System.Data.SQLite.dll.config
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\Parminox.LibraryForm.resources
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\Parminox.MF.resources
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\Parminox.Properties.Resources.resources
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\Parminox.WorksForm.resources
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\ScoreVoices.csproj.GenerateResource.cache
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\ScoreVoices.csproj.CoreCompileInputs.cache
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\ScoreVoices.csproj.CopyComplete
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\Parminox.exe
+D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Debug\Parminox.pdb
