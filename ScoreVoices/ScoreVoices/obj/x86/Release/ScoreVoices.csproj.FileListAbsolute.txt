@@ -14,3 +14,20 @@ D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVo
 D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVoices.csproj.CopyComplete
 D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.exe
 D:\C#\Projects\ScoreVoiceLibrary\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.pdb
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\bin\Release\sqlite3.dll
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\bin\Release\Parminox.exe.config
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\bin\Release\Parminox.exe
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\bin\Release\Parminox.pdb
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\bin\Release\System.Data.SQLite.dll
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\bin\Release\System.Data.SQLite.xml
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\bin\Release\System.Data.SQLite.dll.config
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVoices.csprojAssemblyReference.cache
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.LibraryForm.resources
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.MF.resources
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.Properties.Resources.resources
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.WorksForm.resources
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVoices.csproj.GenerateResource.cache
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVoices.csproj.CoreCompileInputs.cache
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\ScoreVoices.csproj.CopyComplete
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.exe
+D:\C#\Win Projects\Parminox\ScoreVoices\ScoreVoices\obj\x86\Release\Parminox.pdb
