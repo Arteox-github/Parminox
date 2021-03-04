@@ -81,6 +81,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Parminox_MySQL.cs" />
     <Compile Include="Globals.cs" />
     <Compile Include="LibForm.cs">
       <SubType>Form</SubType>

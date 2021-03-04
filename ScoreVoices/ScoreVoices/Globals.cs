@@ -100,6 +100,7 @@ namespace Parminox
         }
     }
     //========================================================================
+    //========================================================================
     public delegate void DGDrawScoreHeaderWithFrame(Graphics ScoreGraphics, string HeaderText, Rectangle HeaderRect, bool DrawFrame);
     //========================================================================
     public static class GI
@@ -107,7 +108,8 @@ namespace Parminox
         public static List<ScoreItem> ScoreLibrary = new List<ScoreItem>();
         public static List<IntStringPair> ProjectList;
         public static readonly string db_name = "Parminox.db";
-        public static string DBConnectionString = String.Empty;
+        //public static string DBConnectionString = String.Empty;
+        public static SQL_Class M_Connection = null;
 
         public static DGDrawScoreHeaderWithFrame DrawHeaderDelegate { get; set; }
         public static string CurrentDirectory;
@@ -118,7 +120,6 @@ namespace Parminox
         public static List<string> VoiceList = new List<string>();
         public static LibraryForm LF;
         public static WorksForm WF;
-        //public static readonly string ParminoxDateTimeFormat = "yyyy.MM.dd HH:mm";
         public static readonly string StandardDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
         //========================================================================================
         public static void InitializeComponents()
@@ -131,203 +132,207 @@ namespace Parminox
         //  ==============================================================
         //  ==============================================================
         //  ==============================================================
+        private static string GetErrorText(int error_code)
+        {
+            switch (error_code)
+            {
+                case 159: return "Ошибка создания базы данных";
+                case 114: return "Ошибка OpenConnection";
+                case 110: return "Ошибка BeginTransaction";
+                case 111: return "Ошибка CommitTransaction";
+                case 112: return "Ошибка RollbackTransaction";
+                case 128: return "Ошибка ExecuteNonQuery";
+                case 91: return "Ошибка ExecuteReader";
+                default: return "Неизвестная ошибка";
+            }
+        }
         //  ==============================================================
         private static void SetupSQLiteDatabase(string PathName)
         {
-            DBConnectionString = $@"Data Source={PathName}; Version=3;";
-            bool loadfromini = (!File.Exists(PathName));
-            if (loadfromini)
+            bool db_missing = (!File.Exists(PathName));
+            try
             {
-                try
-                {
-                    SQLiteConnection.CreateFile(PathName);
-                }
-                catch
-                {
-                    MessageBox.Show("Невозможно создать новую базу данных. Работа программы невозможна.",
-                            "Ошибка сервера SQLite.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    DBConnectionString = String.Empty;
-                    return;
-                }                
+                M_Connection = new SQL_Class(PathName);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Невозможно создать новую базу данных. Работа программы невозможна.",
+                        "Ошибка сервера SQLite.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
             List<VoicePairItem> tempvoiceslist = new List<VoicePairItem>();
-            using (var conn = new SQLiteConnection(DBConnectionString, true))
+            try
             {
-                using (var comm = new SQLiteCommand(String.Empty, conn))
-                {
-                    try
-                    {
-                        conn.Open();  //  await
-                        comm.CommandText = @"BEGIN TRANSACTION;";
-                        comm.ExecuteNonQuery();
-
-                        comm.CommandText = @"CREATE TABLE IF NOT EXISTS [WorksTable](" +
+                M_Connection.ExecuteNonQuery(@"CREATE TABLE IF NOT EXISTS [WorksTable](" +
                              @"[HashCode] INTEGER  PRIMARY KEY NOT NULL, " +
                              @"[FullName] NVARCHAR(1024) NOT NULL UNIQUE, " +
                              @"[HeaderName] NVARCHAR(128)  NOT NULL, " +
-                             @"[Modified] LONG);";
-                        comm.ExecuteNonQuery();
-
-                        comm.CommandText = @"CREATE TABLE IF NOT EXISTS [VoicesTable](" +
+                             @"[Modified] LONG);", true, false, false);
+                M_Connection.ExecuteNonQuery(@"CREATE TABLE IF NOT EXISTS [VoicesTable](" +
                              @"[RowPosition] INTEGER PRIMARY KEY NOT NULL," +
-                             @"[VoiceName] NVARCHAR(64) NOT NULL UNIQUE);";
-                        comm.ExecuteNonQuery();
-
-                        comm.CommandText = @"CREATE TABLE IF NOT EXISTS [VoicesSetsTable](" +
+                             @"[VoiceName] NVARCHAR(64) NOT NULL UNIQUE);", false, false, false);
+                M_Connection.ExecuteNonQuery(@"CREATE TABLE IF NOT EXISTS [VoicesSetsTable](" +
                              @"[VoiceName] NVARCHAR(64) NOT NULL," +
                              @"[TextValue] NVARCHAR(64) NOT NULL," +
-                             @"[HostHashCode] INT); ";
-                        comm.ExecuteNonQuery();
-
-                        if (loadfromini)
+                             @"[HostHashCode] INT); ", false, true, true);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка {ex.Message}.",
+                            "Ошибка создания таблиц в базе SQLite.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            //---------------------------------
+            if (db_missing)
+            {
+                // Filling Works List
+                M_Params mWorksList = new M_Params(CurrentDirectory + "INI\\works.ini");
+                M_Params mSettings = new M_Params(CurrentDirectory + "INI\\settings.ini");
+                if (!mWorksList.Assigned || !mSettings.Assigned)
+                {
+                    MessageBox.Show("Источники данных не найдены.",
+                            "Инициализация программы", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                //+++++++++++++++++++++++++++
+                //  Filling VoiceTable
+                string vname = String.Empty;
+                VoiceList.Clear();
+                try
+                {
+                    for (int i = 1; ; i++)
+                    {
+                        vname = mSettings.GetParameter("voices", i.ToString());
+                        if (String.IsNullOrEmpty(vname)) break;
+                        M_Connection.ExecuteNonQuery(
+                            $@"INSERT INTO [VoicesTable] " +
+                            $@"([RowPosition], [VoiceName]) " +
+                            $@"VALUES ('{i.ToString()}', '{vname}');", true, false, false);
+                        VoiceList.Add(vname);
+                    }
+                    //+++++++++++++++++++++++++++
+                    int isec = 0;
+                    string issad = String.Empty;
+                    string ModifiedTime = String.Empty;
+                    string tFullName, tHeaderName, tVoices = String.Empty;
+                    int tHashCode = 0;
+                    DateTime tModified = DateTime.Now;
+                    ScoreLibrary.Clear();
+                    int exvl;
+                    string sss = null;
+                    //  main loop of passing ScoreItems to DB
+                    for ( ; ; )
+                    {
+                        issad = mWorksList.FindNextSection(ref isec);
+                        if (String.IsNullOrEmpty(issad)) break;
+                        //tHashCode = GI.GenerateHashCode();
+                        tHashCode = int.Parse(issad);
+                        tFullName = mWorksList.GetParameter(issad, "FullName").Replace("'", "\"");   //  ' to "
+                        tHeaderName = mWorksList.GetParameter(issad, "ShortName").Replace("'", "\"");
+                        tModified = Convert.ToDateTime(mWorksList.GetParameter(issad, "Modified"));
+                        M_Connection.ExecuteNonQuery(
+                            $@"INSERT INTO [WorksTable] " +
+                            $@"([HashCode], [FullName], [HeaderName], [Modified]) VALUES (" +
+                            $@"'{tHashCode.ToString()}', " +
+                            $@"'{tFullName}', " +
+                            $@"'{tHeaderName}', " +
+                            $@"'{tModified.ToBinary().ToString()}');", true, false, false);
+                        // DateTime il = DateTime.FromBinary((long)reader["Modified"]);
+                        //---------------------
+                        // filling voice list
+                        tempvoiceslist = DivideToVoicesArrayList(mWorksList.GetParameter(issad, "Voices"));
+                        for (int i = 0; i < tempvoiceslist.Count; i++)
                         {
-                            // Filling Works List
-                            M_Params mWorksList = new M_Params(CurrentDirectory + "INI\\works.ini");
-                            M_Params mSettings = new M_Params(CurrentDirectory + "INI\\settings.ini");
-                            if (!mWorksList.Assigned || !mSettings.Assigned)
+                            sss = tempvoiceslist[i].VoiceName;
+                            for ( ; ; )
                             {
-                                return;  //  goes to FINALLY section
+                                //   Remove leading "stars"
+                                if (sss[0] != '*') break;
+                                sss = sss.Remove(0, 1);
                             }
-
-                            //+++++++++++++++++++++++++++
-                            //  Filling VoiceTable
-                            string vname = String.Empty;
-                            VoiceList.Clear();
-                            for (int i = 1; ; i++)
+                            M_Connection.ExecuteNonQuery(
+                                 $@"INSERT INTO [VoicesSetsTable] " +
+                                @"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
+                                $@"'{sss}', " +
+                                $@"'{tempvoiceslist[i].VoiceText}', " +
+                                $@"'{tHashCode.ToString()}')", true, false, false);
+                            exvl = VoiceList.FindIndex(x => x.Equals(sss) || x.Equals("*" + sss));
+                            if (exvl == -1)
                             {
-                                vname = mSettings.GetParameter("voices", i.ToString());
-                                if (String.IsNullOrEmpty(vname)) break;
-                                comm.CommandText = $@"INSERT INTO [VoicesTable] " +
+                                sss = "*" + sss;
+                                M_Connection.ExecuteNonQuery(
+                                     $@"INSERT INTO [VoicesTable] " +
                                     $@"([RowPosition], [VoiceName]) " +
-                                    $@"VALUES ('{i.ToString()}', '{vname}');";
-                                comm.ExecuteNonQuery();
-                                VoiceList.Add(vname);
-                            }
-                            //+++++++++++++++++++++++++++
-                            int isec = 0;
-                            string issad = String.Empty;
-                            string ModifiedTime = String.Empty;
-                            string tFullName, tHeaderName, tVoices = String.Empty;
-                            int tHashCode = 0;
-                            DateTime tModified = DateTime.Now;
-                            ScoreLibrary.Clear();
-                            int exvl;
-                            string sss = null;
-                            //  main circle of passing ScoreItems to DB
-                            for (;;)
-                            {
-                                issad = mWorksList.FindNextSection(ref isec);
-                                if (String.IsNullOrEmpty(issad)) break;
-                                //tHashCode = GI.GenerateHashCode();
-                                tHashCode = int.Parse(issad);
-                                tFullName = mWorksList.GetParameter(issad, "FullName").Replace("'", "\"");
-                                tHeaderName = mWorksList.GetParameter(issad, "ShortName").Replace("'", "\"");
-                                tModified = Convert.ToDateTime(mWorksList.GetParameter(issad, "Modified"));
-
-                                comm.CommandText = $@"INSERT INTO [WorksTable] " +
-                                    $@"([HashCode], [FullName], [HeaderName], [Modified]) VALUES (" +
-                                    $@"'{tHashCode.ToString()}', " + 
-                                    $@"'{tFullName}', " +
-                                    $@"'{tHeaderName}', " +
-                                    $@"'{tModified.ToBinary().ToString()}');";
-                                // DateTime il = DateTime.FromBinary((long)reader["Modified"]);
-                                comm.ExecuteNonQuery();
-
-                                // filling voice list
-                                tempvoiceslist = DivideToVoicesArrayList(mWorksList.GetParameter(issad, "Voices"));
-                                for (int i = 0; i < tempvoiceslist.Count; i++)
-                                {
-                                    sss = tempvoiceslist[i].VoiceName;
-                                    for (;;)
-                                    {
-                                        //   Remove all "stars"
-                                        if (sss[0] != '*') break;
-                                        sss = sss.Remove(0, 1);
-                                    }
-                                    comm.CommandText = $@"INSERT INTO [VoicesSetsTable] " +
-                                        @"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
-                                        $@"'{sss}', " +
-                                        $@"'{tempvoiceslist[i].VoiceText}', " +
-                                        $@"'{tHashCode.ToString()}')";
-                                    comm.ExecuteNonQuery();
-
-                                    exvl = VoiceList.FindIndex(x => x.Equals(sss) || x.Equals("*" + sss));
-                                    if (exvl == -1)
-                                    {
-                                        sss = "*" + sss;
-                                        comm.CommandText = $@"INSERT INTO [VoicesTable] " +
-                                            $@"([RowPosition], [VoiceName]) " +
-                                            $@"VALUES ('{VoiceList.Count + 1}', '{sss}');";
-                                        comm.ExecuteNonQuery();
-                                        VoiceList.Add(sss);
-                                    }
-                                }
-                                ScoreLibrary.Add(new ScoreItem(tHashCode, tFullName, tHeaderName, tempvoiceslist));
-                                tempvoiceslist.Clear();
-                            }  //  main circle of passing ScoreItems to DB
-                            //++++++++++++++++++++++++++++++++++++++++++++++++++++
-                            comm.CommandText = @"COMMIT TRANSACTION";
-                            comm.ExecuteNonQuery();
-                            //++++++++++++++++++++++++++++++++++++++++++++++++++++
-                        }
-                        //=============================================
-                        else    //  load from DB
-                        {
-                            //  retrieveing scoreitems from DB to 
-                            comm.CommandText = @"SELECT [HashCode], [FullName], [HeaderName] " +
-                                @"FROM [WorksTable] " +
-                                @"ORDER BY [FullName];";
-                            using (SQLiteDataReader reader = comm.ExecuteReader())
-                            {
-                                while (reader.Read())
-                                {
-                                    ScoreLibrary.Add(new ScoreItem(Convert.ToInt32(reader[0]), reader[1] as string, reader[2] as string, new List<VoicePairItem>()));
-                                }
-                            }
-                            //  retrieveing Voice Sets Data from DB to ScoreLibrary
-                            for (int ilib = 0; ilib < ScoreLibrary.Count; ilib++)
-                            {
-                                comm.CommandText = @"SELECT [VoiceName], [TextValue] " +
-                                @"FROM [VoicesSetsTable] " +
-                                $@"WHERE [HostHashCode] = '{ScoreLibrary[ilib].HashCode.ToString()}';";
-                                using (SQLiteDataReader reader = comm.ExecuteReader())
-                                {
-                                    while (reader.Read())
-                                    {
-                                        ScoreLibrary[ilib].VoicePairList.Add(new VoicePairItem(reader[0] as string, reader[1] as string));
-                                    }
-                                }
-                            }
-                            //  retrieveing voicelist from DB
-                            VoiceList.Clear();
-                            comm.CommandText = @"SELECT [VoiceName]  FROM [VoicesTable] ORDER BY [RowPosition];";
-                            using (SQLiteDataReader reader = comm.ExecuteReader())
-                            {
-                                while (reader.Read())
-                                {
-                                    VoiceList.Add(reader["VoiceName"].ToString());
-                                }
+                                    $@"VALUES ('{VoiceList.Count + 1}', '{sss}');", true, false, false);
+                                VoiceList.Add(sss);
                             }
                         }
-                    }
-                    catch
+                        ScoreLibrary.Add(new ScoreItem(tHashCode, tFullName, tHeaderName, tempvoiceslist));
+                        tempvoiceslist.Clear();
+                    }  //  main loop of passing ScoreItems to DB
+                       //++++++++++++++++++++++++++++++++++++++++++++++++++++
+                    M_Connection.CommitTransaction();
+                    M_Connection.CloseConnection();
+                    //++++++++++++++++++++++++++++++++++++++++++++++++++++
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка {ex.Message}.",
+                            "Ошибка перенесения информации в базу данных из INI-файлов.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }                
+            }
+            //=============================================
+            else    //  load from DB
+            {
+                //  retrieving scoreitems from DB
+                try
+                {
+                    M_Connection.ExecuteReaderWithCallBackAction(
+                    @"SELECT [HashCode], [FullName], [HeaderName] " +
+                    @"FROM [WorksTable] " +
+                    @"ORDER BY [FullName];", true,
+                    (r) =>
                     {
-                        comm.CommandText = @"ROLLBACK TRANSACTION;";
-                        comm.ExecuteNonQuery();
-                        DBConnectionString = String.Empty;
-                        MessageBox.Show("Ошибка в функционировании базы данных. Работа программы невозможна.",
-                            "Ошибка доступа к базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        if (ScoreLibrary.Count > 0) ScoreLibrary.Clear();
-                        if (VoiceList.Count > 0) VoiceList.Clear();
-                    }
-                    finally
-                    {
-                        if (conn.State == System.Data.ConnectionState.Open)
+                        while (r.Read())
                         {
-                            conn.Close();
+                            ScoreLibrary.Add(new ScoreItem(Convert.ToInt32(r[0]), r[1] as string, r[2] as string, new List<VoicePairItem>()));
                         }
+                    });
+                    //  retrieving Voice Sets Data from DB to ScoreLibrary
+                    for (int ilib = 0; ilib < ScoreLibrary.Count; ilib++)
+                    {
+                        M_Connection.ExecuteReaderWithCallBackAction(
+                            @"SELECT [VoiceName], [TextValue] " +
+                            @"FROM [VoicesSetsTable] " +
+                            $@"WHERE [HostHashCode] = '{ScoreLibrary[ilib].HashCode.ToString()}';", true,
+                            (r) =>
+                            {
+                                while (r.Read())
+                                {
+                                    ScoreLibrary[ilib].VoicePairList.Add(new VoicePairItem(r[0] as string, r[1] as string));
+                                }
+                            });
                     }
+                    //  retrieving voicelist from DB
+                    VoiceList.Clear();
+                    M_Connection.ExecuteReaderWithCallBackAction(
+                         @"SELECT [VoiceName]  FROM [VoicesTable] ORDER BY [RowPosition];", true,
+                         (r) =>
+                         {
+                             while (r.Read())
+                             {
+                                 VoiceList.Add(r["VoiceName"].ToString());
+                             }
+                         });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка { ex.Message}. Работа программы невозможна.",
+                           "Ошибка чтения данных из базы данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    if (ScoreLibrary.Count > 0) ScoreLibrary.Clear();
+                    if (VoiceList.Count > 0) VoiceList.Clear();
                 }
             }
         }
@@ -342,7 +347,7 @@ namespace Parminox
                 byte[] rno = new byte[4];
                 int result;
                 int i;
-                for (;;)
+                for ( ; ; )
                 {
                     rg.GetBytes(rno);
                     result = BitConverter.ToInt32(rno, 0);  // & 0x7FFFFFFF;
@@ -356,138 +361,119 @@ namespace Parminox
         //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         public static bool ProcessScoreItemToDatabase(ScoreItem baseitem, int mode)
         {
-            if (String.IsNullOrEmpty(DBConnectionString)) return false;
+            if (!M_Connection.Valid) return false;
             ScoreItem b_item = new ScoreItem(baseitem);
-            bool no_error = false;
-            using (var conn = new SQLiteConnection(DBConnectionString))
+            DateTime _modified = DateTime.Now;
+            string s_hashcode = b_item.HashCode.ToString();
+            int w_index = FindScoreByHashcode(b_item.HashCode);
+            string ExceptionMessageBoxHeader = "Ошибка обновления данных произведения в базе данных.";
+            try
             {
-                using (var comm = new SQLiteCommand(String.Empty, conn))
+                switch (mode)
                 {
-                    DateTime _modified = DateTime.Now;
-                    try
-                    {
-                        conn.Open();
-                        comm.CommandText = @"BEGIN TRANSACTION;";
-                        comm.ExecuteNonQuery();
-                        string s_hashcode = b_item.HashCode.ToString();
-                        int w_index = FindScoreByHashcode(b_item.HashCode);
-
-                        switch (mode)
+                    case 0:      //  Update
                         {
-                            case 0:      //  Update
+                            string s_fullname = String.Empty;
+                            string s_headername = String.Empty;
+                            if (w_index >= 0)
+                            {
+                                if (!String.IsNullOrEmpty(b_item.FullName))
                                 {
-                                    string s_fullname = String.Empty;
-                                    string s_headername = String.Empty;
-                                    
-                                    if (w_index >= 0)
-                                    {
-                                        if (!String.IsNullOrEmpty(b_item.FullName))
-                                        {
-                                            s_fullname = $@"[FullName] = '{b_item.FullName}', ";
-                                        }
-                                        if (!String.IsNullOrEmpty(b_item.HeaderName))
-                                        {
-                                            s_headername = $@"[HeaderName] = '{b_item.HeaderName}', ";
-                                        }
-
-                                        comm.CommandText = @"UPDATE [WorksTable] SET " +
-                                        s_fullname +
-                                        s_headername +
-                                        $@"[Modified] = '{_modified.ToString(StandardDateTimeFormat)} '" +
-                                        @" WHERE rowid IN (SELECT rowid FROM [WorksTable] " +
-                                        $@"WHERE [HashCode] = '{s_hashcode}' LIMIT 1);";
-                                        comm.ExecuteNonQuery();
-
-                                        if (b_item.VoicePairList.Count > 0)
-                                        {
-                                            comm.CommandText = @"DELETE FROM [VoicesSetsTable] " +
-                                                 $@"WHERE [HostHashCode] = '{s_hashcode}';";
-                                            comm.ExecuteNonQuery();
-                                            for (int vsi = 0; vsi < b_item.VoicePairList.Count; vsi++)
-                                            {
-                                                comm.CommandText = @"INSERT INTO [VoicesSetsTable] " +
-                                                      $@"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
-                                                $@"'{b_item.VoicePairList[vsi].VoiceName}', " +
-                                                $@"'{b_item.VoicePairList[vsi].VoiceText}', " +
-                                                $@"'{s_hashcode}');";
-                                                comm.ExecuteNonQuery();
-                                            }
-                                            //++++++++++++++++++++
-                                            ScoreLibrary[w_index].VoicePairList = b_item.VoicePairList;
-                                        }
-                                        if (!String.IsNullOrEmpty(b_item.FullName))
-                                        {
-                                            ScoreLibrary[w_index].FullName = b_item.FullName;
-                                        }
-                                        if (!String.IsNullOrEmpty(b_item.HeaderName))
-                                        {
-                                            ScoreLibrary[w_index].HeaderName = b_item.HeaderName;
-                                        }
-                                    }
-                                    break;
+                                    s_fullname = $@"[FullName] = '{b_item.FullName}', ";
                                 }
-                            case 1:     //  Insert
+                                if (!String.IsNullOrEmpty(b_item.HeaderName))
                                 {
-                                    int _hashcode = GI.GenerateHashCode();
-                                    comm.CommandText = @"INSERT INTO [WorksTable] " +
-                                                @"([HashCode], [FullName], [HeaderName], [Modified]) VALUES " +
-                                                $@"('{_hashcode.ToString()}', " +
-                                                $@"'{b_item.FullName}', " +
-                                                $@"'{b_item.HeaderName}', " +
-                                                $@"'{_modified.ToString(StandardDateTimeFormat)}');";
-                                    comm.ExecuteNonQuery();
-                                    if (b_item.VoicePairList.Count > 0)
-                                    {
-                                        for (int i_ins = 0; i_ins < b_item.VoicePairList.Count; i_ins++)
-                                        {
-                                            comm.CommandText = @"INSERT INTO [VoicesSetsTable] " +
-                                                @"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
-                                                $@"'{b_item.VoicePairList[i_ins].VoiceName}', " +
-                                                $@"'{b_item.VoicePairList[i_ins].VoiceText}', " +
-                                                $@"'{_hashcode.ToString()}')";
-                                            comm.ExecuteNonQuery();
-                                        }
-                                    }
-                                    ScoreLibrary.Add(new ScoreItem(_hashcode, b_item.FullName, b_item.HeaderName, b_item.VoicePairList));
-                                    break;
+                                    s_headername = $@"[HeaderName] = '{b_item.HeaderName}', ";
                                 }
-                            case 2:    //  Delete
+                                M_Connection.ExecuteNonQuery(
+                                     @"UPDATE [WorksTable] SET " +
+                                     s_fullname +
+                                     s_headername +
+                                     $@"[Modified] = '{_modified.ToString(StandardDateTimeFormat)} '" +
+                                     @" WHERE rowid IN (SELECT rowid FROM [WorksTable] " +
+                                     $@"WHERE [HashCode] = '{s_hashcode}' LIMIT 1);", true, false, false);
+                                if (b_item.VoicePairList.Count > 0)   //  Delete old >> Insert new
                                 {
-                                    comm.CommandText = @"DELETE FROM [WorksTable] " +
-                                        @"WHERE rowid IN (SELECT rowid FROM [WorksTable] " +
-                                        $@"WHERE [HashCode] = '{s_hashcode}' LIMIT 1);";
-                                    comm.ExecuteNonQuery();
-
-                                    comm.CommandText = @"DELETE FROM [VoicesSetsTable] " +
-                                        $@"WHERE [HostHashCode] = '{s_hashcode}';";
-                                    comm.ExecuteNonQuery();
-                                    if (w_index >= 0)
+                                    M_Connection.ExecuteNonQuery(
+                                         @"DELETE FROM [VoicesSetsTable] " +
+                                         $@"WHERE [HostHashCode] = '{s_hashcode}';", true, false, false);
+                                    for (int vsi = 0; vsi < b_item.VoicePairList.Count; vsi++)
                                     {
-                                        ScoreLibrary.RemoveAt(w_index);
-                                        RemovePhantomProjectItems();
+                                        M_Connection.ExecuteNonQuery(
+                                             @"INSERT INTO [VoicesSetsTable] " +
+                                              $@"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
+                                              $@"'{b_item.VoicePairList[vsi].VoiceName}', " +
+                                              $@"'{b_item.VoicePairList[vsi].VoiceText}', " +
+                                              $@"'{s_hashcode}');", true, false, false);
+                                        //++++++++++++++++++++
+                                        ScoreLibrary[w_index].VoicePairList = b_item.VoicePairList;
                                     }
-                                    break;
                                 }
-                        }   //  switch
-                        comm.CommandText = @"COMMIT TRANSACTION;";
-                        comm.ExecuteNonQuery();
-                        no_error = true;
-                    }   //  try
-                    catch
-                    {
-                        comm.CommandText = @"ROLLBACK TRANSACTION;";
-                        comm.ExecuteNonQuery();
-                    }
-                    finally
-                    {
-                        if (conn.State == System.Data.ConnectionState.Open)
-                        {
-                            conn.Close();
+                                if (!String.IsNullOrEmpty(b_item.FullName))
+                                {
+                                    ScoreLibrary[w_index].FullName = b_item.FullName;
+                                }
+                                if (!String.IsNullOrEmpty(b_item.HeaderName))
+                                {
+                                    ScoreLibrary[w_index].HeaderName = b_item.HeaderName;
+                                }
+                            }
+                            break;
                         }
-                    }
-                }
+                    case 1:     //  Insert
+                        {
+                            ExceptionMessageBoxHeader = "Ошибка добавления произведения в базу данных.";
+                            int _hashcode = GI.GenerateHashCode();
+                            M_Connection.ExecuteNonQuery(
+                                @"INSERT INTO [WorksTable] " +
+                                        @"([HashCode], [FullName], [HeaderName], [Modified]) VALUES " +
+                                        $@"('{_hashcode.ToString()}', " +
+                                        $@"'{b_item.FullName}', " +
+                                        $@"'{b_item.HeaderName}', " +
+                                        $@"'{_modified.ToString(StandardDateTimeFormat)}');", true, false, false);
+                            if (b_item.VoicePairList.Count > 0)
+                            {
+                                for (int i_ins = 0; i_ins < b_item.VoicePairList.Count; i_ins++)
+                                {
+                                    M_Connection.ExecuteNonQuery(
+                                         @"INSERT INTO [VoicesSetsTable] " +
+                                        @"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
+                                        $@"'{b_item.VoicePairList[i_ins].VoiceName}', " +
+                                        $@"'{b_item.VoicePairList[i_ins].VoiceText}', " +
+                                        $@"'{_hashcode.ToString()}')", true, false, false);
+                                }
+                            }
+                            ScoreLibrary.Add(new ScoreItem(_hashcode, b_item.FullName, b_item.HeaderName, b_item.VoicePairList));
+                            break;
+                        }
+                    case 2:    //  Delete
+                        {
+                            ExceptionMessageBoxHeader = "Ошибка удаления произведения из базы данных.";
+                            M_Connection.ExecuteNonQuery(
+                                @"DELETE FROM [WorksTable] " +
+                                @"WHERE rowid IN (SELECT rowid FROM [WorksTable] " +
+                                $@"WHERE [HashCode] = '{s_hashcode}' LIMIT 1);", true, false, false);
+                            M_Connection.ExecuteNonQuery(
+                                @"DELETE FROM [VoicesSetsTable] " +
+                                $@"WHERE [HostHashCode] = '{s_hashcode}';", false, false, false);
+                            if (w_index >= 0)
+                            {
+                                ScoreLibrary.RemoveAt(w_index);
+                                RemovePhantomProjectItems();
+                            }
+                            break;
+                        }
+                }   //  switch
+                //M_Connection.CommitTransaction();
+                M_Connection.CloseConnection();
+                return true;
             }
-            return no_error;
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка { ex.Message}. Работа программы остановлена.",
+                          ExceptionMessageBoxHeader, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
         }
         //==============================================================================
         public static void RemovePhantomProjectItems()
@@ -506,77 +492,58 @@ namespace Parminox
         //==============================================================================
         public static bool RenameDeleteInstrument(string init_value, string new_value)
         {
-            if (String.IsNullOrEmpty(DBConnectionString)) return false;
+            if (!M_Connection.Valid ) return false;
             string _init_value = init_value;
             string _new_value = new_value;
             bool no_error = true;
             bool is_removing = (String.IsNullOrEmpty(new_value));
-            using (var conn = new SQLiteConnection(DBConnectionString))
-            {
-                using (var comm = new SQLiteCommand(String.Empty, conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        //  updating instrument name
-                        comm.CommandText = @"BEGIN TRANSACTION;";
-                        comm.ExecuteNonQuery();
-                        //++++++++++++++++++++++++++++++++++++++++++++++
-                        //    updating instrument name throughout VoicesSetTable
-                        //++++++++++++++++++++++++++++++++++++++++++++++
-                        string csstr = (is_removing) ?
-                            @"DELETE FROM [VoicesTable]"
-                            :
-                            $@"UPDATE [VoicesTable] SET [VoiceName] = '{_new_value}'";
-                        comm.CommandText = csstr + @" WHERE rowid IN (SELECT rowid FROM [VoicesTable] " +
-                            $@"WHERE [VoiceName] = '{_init_value}' LIMIT 1);";
-                        comm.ExecuteNonQuery();
 
-                        comm.CommandText = @"COMMIT TRANSACTION";
-                        comm.ExecuteNonQuery();
-                        //++++++++++++++++++++++++++++++++++++++++++++++
-                        // updating Instrument List
-                        for (int i = 0; i < VoiceList.Count; i++)
+            try
+            {
+                //  updating instrument name
+                //++++++++++++++++++++++++++++++++++++++++++++++
+                //    updating instrument name throughout VoicesSetTable
+                //++++++++++++++++++++++++++++++++++++++++++++++
+                string csstr = (is_removing) ?
+                    @"DELETE FROM [VoicesTable]" : $@"UPDATE [VoicesTable] SET [VoiceName] = '{_new_value}'";
+                M_Connection.ExecuteNonQuery(
+                     csstr + @" WHERE rowid IN (SELECT rowid FROM [VoicesTable] " +
+                    $@"WHERE [VoiceName] = '{_init_value}' LIMIT 1);", true, true, true);
+                // "COMMIT TRANSACTION" + "BEGIN TRANSACTION;";;
+                //++++++++++++++++++++++++++++++++++++++++++++++
+                // updating Instrument List
+                for (int i = 0; i < VoiceList.Count; i++)
+                {
+                    if (!_init_value.Equals(VoiceList[i])) continue;
+                    if (is_removing)
+                    {
+                        VoiceList.RemoveAt(i);
+                    }
+                    else
+                    {
+                        VoiceList[i] = _new_value;
+                    }
+                    break;
+                }
+                // updating instrument name through ScoreLibrary
+                if (!is_removing)
+                {
+                    for (int iic = 0; iic < ScoreLibrary.Count; iic++)
+                    {
+                        for (int ivlc = 0; ivlc < ScoreLibrary[iic].VoicePairList.Count; ivlc++)
                         {
-                            if (!_init_value.Equals(VoiceList[i])) continue;
-                            if (is_removing)
-                            {
-                                VoiceList.RemoveAt(i);
-                            }
-                            else
-                            {
-                                VoiceList[i] = _new_value;
-                            }
+                            if (!_init_value.Equals(ScoreLibrary[iic].VoicePairList[ivlc].VoiceName)) continue;
+                            ScoreLibrary[iic].VoicePairList[ivlc].VoiceName = _new_value;
                             break;
-                        }
-                        // updating instrument name through ScoreLibrary
-                        if (!is_removing)
-                        {
-                            for (int iic = 0; iic < ScoreLibrary.Count; iic++)
-                            {
-                                for (int ivlc = 0; ivlc < ScoreLibrary[iic].VoicePairList.Count; ivlc++)
-                                {
-                                    if (!_init_value.Equals(ScoreLibrary[iic].VoicePairList[ivlc].VoiceName)) continue;
-                                    ScoreLibrary[iic].VoicePairList[ivlc].VoiceName = _new_value;
-                                    break;
-                                }
-                            }
-                        }                        
-                    }
-                    catch
-                    {
-                        comm.CommandText = @"ROLLBACK TRANSACTION;";
-                        comm.ExecuteNonQuery();
-                        no_error = false;
-                    }
-                    finally
-                    {
-                        if (conn.State == System.Data.ConnectionState.Open)
-                        {
-                            conn.Close();
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка { ex.Message}. Работа программы приостановлена.",
+                           "Ошибка обновления списка инструментов в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                no_error = false;
             }
             return no_error;
         }
@@ -590,64 +557,46 @@ namespace Parminox
         {
             return ScoreLibrary.FindIndex(x => x.HashCode == hashcode);
         }
-
+        //==================================================================
         public static bool FlushVoiceList(List<string> listcopy)
         {
-            if (String.IsNullOrEmpty(DBConnectionString)) return false;
-            bool no_error = true;
-            using (var conn = new SQLiteConnection(DBConnectionString))
+            if (!M_Connection.Valid) return false;
+            try
             {
-                using (var comm = new SQLiteCommand(String.Empty, conn))
+                //  BEGIN TRANSACTION + COMMIT TRANSACTION
+                M_Connection.ExecuteNonQuery(@"DROP TABLE [VoicesTable];", true, false, false);
+                M_Connection.ExecuteNonQuery(
+                    @"CREATE TABLE [VoicesTable](" +
+                     @"[RowPosition] INTEGER PRIMARY KEY NOT NULL," +
+                     @"[VoiceName] NVARCHAR(64) NOT NULL UNIQUE);", false, false, false);
+                VoiceList.Clear();
+
+                if (listcopy.Count > 0)
                 {
-                    try
+                    for (int i = 0; i < listcopy.Count; i++)
                     {
-                        conn.Open();
-                        comm.CommandText = @"BEGIN TRANSACTION;";
-                        comm.ExecuteNonQuery();
-
-                        comm.CommandText = @"DROP TABLE [VoicesTable];";
-                        comm.ExecuteNonQuery();
-
-                        comm.CommandText = @"CREATE TABLE [VoicesTable](" +
-                             @"[RowPosition] INTEGER PRIMARY KEY NOT NULL," +
-                             @"[VoiceName] NVARCHAR(64) NOT NULL UNIQUE);";
-                        comm.ExecuteNonQuery();
-
-                        for (int i = 0; i < listcopy.Count; i++)
-                        {
-                            comm.CommandText = @"INSERT INTO [VoicesTable] (RowPosition, VoiceName) " +
-                                $@"VALUES ({i + 1}, '{listcopy[i]}');";
-                            comm.ExecuteNonQuery();
-                        }
-
-                        comm.CommandText = @"COMMIT TRANSACTION";
-                        comm.ExecuteNonQuery();
-
-                        VoiceList.Clear();
-                        for (int ivl = 0; ivl < listcopy.Count; ivl++)
-                        {
-                            VoiceList.Add(listcopy[ivl]);
-                        }
-                        //===============================
-                    }   //  try
-                    catch
-                    {
-                        comm.CommandText = @"ROLLBACK TRANSACTION;";
-                        comm.ExecuteNonQuery();
-                        no_error = false;
+                        M_Connection.ExecuteNonQuery(
+                             @"INSERT INTO [VoicesTable] (RowPosition, VoiceName) " +
+                            $@"VALUES ({i + 1}, '{listcopy[i]}');", false, true, true);
                     }
-                    finally
+                    for (int ivl = 0; ivl < listcopy.Count; ivl++)
                     {
-                        if (conn.State == System.Data.ConnectionState.Open)
-                        {
-                            conn.Close();
-                        }
+                        VoiceList.Add(listcopy[ivl]);
                     }
                 }
+                //M_Connection.CommitTransaction();
+                M_Connection.CloseConnection();
+                return true;
+                //===============================
+            }   //  try
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка { ex.Message}. Работа программы приостановлена.",
+                           "Ошибка сохранения списка инструментов в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
             }
-            return no_error;
         }
-
+        //==================================================================
         public static List<VoicePairItem> DivideToVoicesArrayList(string SourceString)   // List<string> VoiceName, List<string> VoiceText)
         {
             List<VoicePairItem> pairs = new List<VoicePairItem>();
@@ -664,7 +613,7 @@ namespace Parminox
             }
             return pairs;
         }
-
+        //==================================================================
         public static VoicePairItem GetListPair(string gpivis, ref int ipos)
         {
             string gpcoms1 = String.Empty;
@@ -703,8 +652,6 @@ namespace Parminox
         //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
         /*
        public static void FlushScoreItemsListToINI()
        {
@@ -721,22 +668,12 @@ namespace Parminox
            }
            mWorksList.FlushFile();
        }
-           */
-
-
-        /*
-
-
-    M_Params mSettings = new M_Params(SettingsFilename);
-    mSettings.RemoveSection("voices");
-    for (int i = 0; i < VoiceList.Count; i++) mSettings.StoreParameter("voices", (i + 1).ToString(), VoiceList[i]);
-    mSettings.FlushFile();
-}
-    */
-
-        //===============================================================================================
-
-        /*
+       //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        M_Params mSettings = new M_Params(SettingsFilename);
+        mSettings.RemoveSection("voices");
+        for (int i = 0; i < VoiceList.Count; i++) mSettings.StoreParameter("voices", (i + 1).ToString(), VoiceList[i]);
+        mSettings.FlushFile();
+        //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         public static void SortScoreItemList()
         {
             ScoreLibrary.Sort((x1, x2) => x1.FullName.CompareTo(x2.FullName));

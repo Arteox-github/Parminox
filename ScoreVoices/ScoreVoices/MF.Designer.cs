@@ -353,6 +353,7 @@
             this.cbDrop.TabIndex = 1;
             this.cbDrop.TabStop = false;
             this.cbDrop.SelectedIndexChanged += new System.EventHandler(this.cbDrop_SelectedIndexChanged);
+            this.cbDrop.DropDownClosed += new System.EventHandler(this.cbDrop_DropDownClosed);
             // 
             // lbTopField
             // 

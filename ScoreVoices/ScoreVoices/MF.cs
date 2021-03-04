@@ -259,7 +259,7 @@ namespace Parminox
                 ServeTooManyVoicesInList();
             }
         }
-
+        //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         private void ConstructPage(Graphics gf, int Mode)   //  Mode: 0 - screen, 1 - printer
         {
             int ix = 0;
@@ -532,9 +532,9 @@ namespace Parminox
         };
 
         private readonly string[] DayOfWeekList = new string[]
-{
+        {
             "Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"
-};
+        };
 
         private void SetupDate(DateTime MyDateTime)
         {
@@ -655,18 +655,12 @@ namespace Parminox
             ServeTopRightField(cbDrop.SelectedIndex);
             MFConstructPage();
         }
-
+        //=======================================================
         string HeaderTextboxBuffer = String.Empty;
         private void ServeTopRightField(int fIndex)
         {
             switch (fIndex)
             {
-                case -1:
-                    {
-                        cbDrop.SelectedIndex = 0;
-                        fIndex = 0;
-                        goto case 0;
-                    }
                 case 0:  //  dateTimePicker
                     {
                         dateTimePicker.Visible = true;
@@ -702,7 +696,18 @@ namespace Parminox
                             break;
                         }
                     }
+                default:
+                    {
+                        cbDrop.SelectedIndex = 0;
+                        fIndex = 0;
+                        goto case 0;
+                    }
             }
+        }
+
+        private void cbDrop_DropDownClosed(object sender, EventArgs e)
+        {
+            this.ActiveControl = null;
         }
 
         private void headerTextBox_TextChanged(object sender, EventArgs e)
@@ -838,7 +843,7 @@ namespace Parminox
         private string ServeEmptyColumnText(string InputValue)
         {
             string ws = String.Empty;
-            if (InputValue != null)
+            if (!String.IsNullOrEmpty(InputValue))
             {
                 ws = InputValue.Trim();
             }
@@ -1034,14 +1039,7 @@ namespace Parminox
                 MFConstructPage();
             }
         }
-
-
-
-
-
-
-
-
+        
         //===============================================================================
         //===============================================================================
         //===============================================================================
