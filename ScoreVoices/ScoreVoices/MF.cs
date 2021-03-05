@@ -73,6 +73,7 @@ namespace Parminox
             {
                 Header_Font.Dispose();
             }
+            GI.FinalizeGlobals();
         }
         //===============================================================
         public void ServeMouseWheel(object sender, MouseEventArgs e)

@@ -306,7 +306,7 @@ namespace Parminox
                         M_Connection.ExecuteReaderWithCallBackAction(
                             @"SELECT [VoiceName], [TextValue] " +
                             @"FROM [VoicesSetsTable] " +
-                            $@"WHERE [HostHashCode] = '{ScoreLibrary[ilib].HashCode.ToString()}';", true,
+                            $@"WHERE [HostHashCode] = '{ScoreLibrary[ilib].HashCode.ToString()}';", false,
                             (r) =>
                             {
                                 while (r.Read())
@@ -637,6 +637,15 @@ namespace Parminox
             }
             if (String.IsNullOrEmpty(gpcoms2)) return (null);
             return new VoicePairItem(gpcoms1, gpcoms2);
+        }
+
+        public static void FinalizeGlobals()
+        {
+            if (M_Connection != null)
+            {
+                M_Connection.Dispose();
+                M_Connection = null;
+            }
         }
 
         //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

@@ -50,6 +50,7 @@ namespace Parminox
                 dGridListCopy.Add(dGrid[0, i].Value as string);
             }
 
+            Cursor.Current = Cursors.WaitCursor;
             if (GI.FlushVoiceList(dGridListCopy))
             {
                 MessageBox.Show("Список инструментов сохранён.", "Состав оркестра", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -58,8 +59,10 @@ namespace Parminox
             }
             else
             {
-                MessageBox.Show("Список инструментов не обновлён.", "Ошибка записи в базу данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Cursor.Current = Cursors.Default;
+               MessageBox.Show("Список инструментов не обновлён.", "Ошибка записи в базу данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            Cursor.Current = Cursors.Default;
             dGrid.Focus();
         }
 
@@ -202,6 +205,7 @@ namespace Parminox
                 {
                     return;
                 }
+                Cursor.Current = Cursors.WaitCursor;
                 if (GI.ProcessScoreItemToDatabase(GI.ScoreLibrary[wsi], 2))  //  REMOVE
                 {
                     if (wsi >= GI.ScoreLibrary.Count) wsi--;
@@ -211,8 +215,10 @@ namespace Parminox
                 }
                 else
                 {
+                    Cursor.Current = Cursors.Default;
                     MessageBox.Show("Список произведений не обновлён.", "Ошибка записи в базу данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
+                Cursor.Current = Cursors.Default;
                 dGrid.Focus();
             }
         }
@@ -236,6 +242,7 @@ namespace Parminox
             {
                 return;
             }
+            Cursor.Current = Cursors.WaitCursor;
             if (GI.RenameDeleteInstrument(inm, String.Empty))
             {
                 dGrid.Rows.RemoveAt(delindex);
@@ -243,8 +250,10 @@ namespace Parminox
             }
             else
             {
+                Cursor.Current = Cursors.Default;
                 MessageBox.Show($"Инструмент {inm} из базы данных не удалён.", "Ошибка записи в базу данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            Cursor.Current = Cursors.Default;
         }
 
         private void dGrid_CellEndEdit(object sender, DataGridViewCellEventArgs e)

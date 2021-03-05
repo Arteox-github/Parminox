@@ -198,6 +198,7 @@ namespace Parminox
                 mode = 0;   //  update
             }
             //-------------------------------------------------------
+            Cursor.Current = Cursors.WaitCursor;
             if (GI.ProcessScoreItemToDatabase(sitt, mode))
             {
                 btSave.Enabled = false;
@@ -206,10 +207,12 @@ namespace Parminox
             }
             else
             {
+                Cursor.Current = Cursors.Default;
                 MessageBox.Show("Список произведений не обновлён.", "Ошибка записи в базу данных.", 
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 tbTitle.Focus();
             }
+            Cursor.Current = Cursors.Default;
         }
         //================================================================
         private bool VoicePairItemListIdent(List<VoicePairItem> list1, List<VoicePairItem> list2)
