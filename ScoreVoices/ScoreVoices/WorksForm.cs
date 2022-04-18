@@ -79,7 +79,9 @@ namespace Parminox
             btSave.Enabled = false;
             return this.ShowDialog(Sender);
         }
-
+        //=========================================================================
+        //=========================================================================
+        //=========================================================================
         private void SaveItem()
         {
             int _tempScoreIndex = ScoreIndex;
@@ -127,62 +129,30 @@ namespace Parminox
                 // ssin = ssin + (wdGrid.Rows[iv].Cells[0].Value as string) + '>' + wsv2;
             }
             //----------------------------------------------------
-            //----------------------------------------------------
-            ScoreItem sitt = new ScoreItem(0, title_text, header_text, vpi);
+            ScoreItem sitt = new ScoreItem(0, title_text, header_text, vpi);  //  ScoreItem ready to flush
             if (_tempScoreIndex >= 0)
             {
                 sitt.HashCode = GI.ScoreLibrary[_tempScoreIndex].HashCode;
-                if (!sitt.FullName.Equals(GI.ScoreLibrary[_tempScoreIndex].FullName))
-                {
-                    if (MessageBox.Show("Вы изменили название произведения.\nХотите сохранить его как новое?",
-                        "Сохранение редактирования: " + title_text,
-                         MessageBoxButtons.YesNo, MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
-                    {
-                        _tempScoreIndex = -1;
-                        sitt.HashCode = 0;
-                    }
-                }
             }
             //  checking if score item already exists
             int itex = GI.FindScoreByFullname(sitt.FullName);
             if ((itex >= 0) && (itex != _tempScoreIndex))
             {
-                if (MessageBox.Show("Внимание!\nПроизведение с таким названием уже существует в базе данных.\n" +
-                        "Хотите заменить его?", "Сохранение редактирования: " + sitt.FullName,
-                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
-                {
-                    sitt.HashCode = GI.ScoreLibrary[itex].HashCode;
-                }
-                else
-                {
-                    tbTitle.Focus();
-                    return;
-                }
+                MessageBox.Show("Произведение с таким названием уже существует в базе данных.",
+                        "Сохранение редактирования: " + sitt.FullName,
+                        MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                tbTitle.Focus();
+                return;
             }
             //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-            int mode = 1;   // 1 = insert new
-            if (sitt.HashCode != 0)
+            if (!sitt.HashCode.Equals(0)) 
             {
-                //  upgating existing scoreitem
+                //  updating existing ScoreItem
                 ScoreItem sitemp = new ScoreItem(GI.ScoreLibrary[GI.FindScoreByHashcode(sitt.HashCode)]);
-                if (sitt.FullName.Equals(sitemp.FullName))
-                {
-                    sitt.FullName = string.Empty;
-                }
-                //-----
-                if (sitt.HeaderName.Equals(sitemp.HeaderName))
-                {
-                    sitt.HeaderName = string.Empty;
-                }
-                //-----
-                if (VoicePairItemListIdent(sitt.VoicePairList, sitemp.VoicePairList))
-                {
-                    sitt.VoicePairList.Clear();
-                }
-                //-----
-                if (String.IsNullOrEmpty(sitt.FullName) &&
-                     String.IsNullOrEmpty(sitt.HeaderName) &&
-                          (sitt.VoicePairList.Count == 0))
+                bool _changesFound = !sitt.FullName.Equals(sitemp.FullName);
+                if (!_changesFound && !sitt.HeaderName.Equals(sitemp.HeaderName)) _changesFound = true;
+                if (!_changesFound && !VoicePairItemListIdent(sitt.VoicePairList, sitemp.VoicePairList)) _changesFound = true;
+                if (!_changesFound)
                 {
                     btSave.Enabled = false;
                     tbTitle.Focus();
@@ -195,14 +165,13 @@ namespace Parminox
                     tbTitle.Focus();
                     return;
                 }
-                mode = 0;   //  update
             }
             //-------------------------------------------------------
             Cursor.Current = Cursors.WaitCursor;
-            if (GI.ProcessScoreItemToDatabase(sitt, mode))
+            if (GI.ProcessScoreItemToDatabase(sitt, sitt.HashCode.Equals(0) ? 1 : 0))    //  mode 0 - update, 1 - insert new
             {
                 btSave.Enabled = false;
-                GI.WorkToShowHashcode = sitt.HashCode;  //   GI.FindScoreByFullname(title_text).;
+                GI.WorkToShowHashcode = GI.ScoreLibrary[GI.FindScoreByFullname(sitt.FullName)].HashCode;
                 this.DialogResult = System.Windows.Forms.DialogResult.OK;
             }
             else

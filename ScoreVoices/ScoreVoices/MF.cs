@@ -521,6 +521,7 @@ namespace Parminox
             if (showmode == 0) // add work mode
             {
                 btnRemoveLast.Enabled = GI.ProjectList.Count > 0;
+                if (GI.ProjectList.Count > 0) Emphasized = GI.ProjectList.Count - 1;  //  Set Emphasized to  last column
                 TooMuchVoicesWarninigFired = false;
             }
             MFConstructPage();

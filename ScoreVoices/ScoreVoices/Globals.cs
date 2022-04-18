@@ -10,6 +10,7 @@ using System.Data.SQLite;   //System.Data.SqlClient;
 
 namespace Parminox
 {
+    //+++++++++++++++++++++++++++++
     public class VoicePairItem
     {
         public string VoiceName { get; set; }
@@ -27,7 +28,7 @@ namespace Parminox
             VoiceText = voicetext;
         }
     }
-
+    //+++++++++++++++++++++++++++++
     public class ScoreItem
     {
         public int HashCode { get; set; }
@@ -75,7 +76,7 @@ namespace Parminox
             this._voicepairlist = new List<VoicePairItem>();
         }
     }
-    //========================================================================
+    //+++++++++++++++++++++++++++++
     public class IntStringPair
     {
         public int Int_Value { get; set; }
@@ -108,7 +109,6 @@ namespace Parminox
         public static List<ScoreItem> ScoreLibrary = new List<ScoreItem>();
         public static List<IntStringPair> ProjectList;
         public static readonly string db_name = "Parminox.db";
-        //public static string DBConnectionString = String.Empty;
         public static SQL_Class M_Connection = null;
 
         public static DGDrawScoreHeaderWithFrame DrawHeaderDelegate { get; set; }
@@ -358,80 +358,134 @@ namespace Parminox
                 return result;
             }
         }
-        //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        //=====================================================================================
+        //=====================================================================================
+        //=====================================================================================
         public static bool ProcessScoreItemToDatabase(ScoreItem baseitem, int mode)
         {
             if (!M_Connection.Valid) return false;
+            int _mode = mode;   //   mode 0 - update, 1 - insert new, 2- remove
             ScoreItem b_item = new ScoreItem(baseitem);
-            DateTime _modified = DateTime.Now;
-            string s_hashcode = b_item.HashCode.ToString();
-            int w_index = FindScoreByHashcode(b_item.HashCode);
-            string ExceptionMessageBoxHeader = "Ошибка обновления данных произведения в базе данных.";
-            try
+            if (b_item.HashCode.Equals(0))
             {
-                switch (mode)
+                if (_mode.Equals(2))
                 {
-                    case 0:      //  Update
+                    MessageBox.Show($"Попытка удаления произведения с пустым значением HASHCODE.\nСвяжитесь с разработчиком.\nРабота программы остановлена.",
+                                          "Ошибка обновления данных произведения в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return false;
+                    // throw new ArgumentException("Deleting item with non-existing hashcode");
+                }
+                b_item.HashCode = GenerateHashCode();
+                _mode = 1;   //  insert new
+            }
+
+            if (!_mode.Equals(2))  // for REMOVING omit validating titles
+            {
+                if (String.IsNullOrEmpty(b_item.FullName))
+                {
+                    MessageBox.Show($"Попытка записи в базу данных произведения с пустым названием. Работа программы остановлена.",
+                                          "Ошибка обновления данных произведения в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return false;
+                }
+                if (String.IsNullOrEmpty(b_item.HeaderName))
+                {
+                    MessageBox.Show($"Попытка записи в базу данных произведения с пустым названием для заголовка. Работа программы остановлена.",
+                                          "Ошибка обновления данных произведения в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return false;
+                }
+            }
+
+            DateTime _modified = DateTime.Now;
+            string s_hashcode = b_item.HashCode.ToString();       
+
+            switch (_mode)
+            {
+                case 0:      //  Update
+                    {
+                        int w_index = FindScoreByHashcode(b_item.HashCode);
+                        if (w_index < 0)
                         {
-                            string s_fullname = String.Empty;
-                            string s_headername = String.Empty;
-                            if (w_index >= 0)
+                            MessageBox.Show($"Попытка обновления несуществующего произведения.\nСвяжитесь с разработчиком.\nРабота программы остановлена.",
+                                                      "Ошибка обновления данных произведения в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return false;
+                        }
+
+                        string s_fullname = $@"[FullName] = '{b_item.FullName}', ";
+                        string s_headername = $@"[HeaderName] = '{b_item.HeaderName}', ";
+                        try
+                        {
+                            M_Connection.ExecuteNonQuery(
+                             @"UPDATE [WorksTable] SET " +
+                             s_fullname +
+                             s_headername +
+                             $@"[Modified] = '{_modified.ToString(StandardDateTimeFormat)} '" +
+                             @" WHERE rowid IN (SELECT rowid FROM [WorksTable] " +
+                             $@"WHERE [HashCode] = '{s_hashcode}' LIMIT 1);", true, false, false);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Ошибка { ex.Message}. Работа программы остановлена.",
+                                      "Ошибка обновления данных произведения в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return false;
+                        }
+                        if (b_item.VoicePairList.Count > 0) 
+                        {
+                            try
                             {
-                                if (!String.IsNullOrEmpty(b_item.FullName))
-                                {
-                                    s_fullname = $@"[FullName] = '{b_item.FullName}', ";
-                                }
-                                if (!String.IsNullOrEmpty(b_item.HeaderName))
-                                {
-                                    s_headername = $@"[HeaderName] = '{b_item.HeaderName}', ";
-                                }
+                                // Delete old  Instrument list
                                 M_Connection.ExecuteNonQuery(
-                                     @"UPDATE [WorksTable] SET " +
-                                     s_fullname +
-                                     s_headername +
-                                     $@"[Modified] = '{_modified.ToString(StandardDateTimeFormat)} '" +
-                                     @" WHERE rowid IN (SELECT rowid FROM [WorksTable] " +
-                                     $@"WHERE [HashCode] = '{s_hashcode}' LIMIT 1);", true, false, false);
-                                if (b_item.VoicePairList.Count > 0)   //  Delete old >> Insert new
+                                 @"DELETE FROM [VoicesSetsTable] " +
+                                 $@"WHERE [HostHashCode] = '{s_hashcode}';", true, false, false);
+                                for (int vsi = 0; vsi < b_item.VoicePairList.Count; vsi++)    // Instrument list -  Insert new
                                 {
                                     M_Connection.ExecuteNonQuery(
-                                         @"DELETE FROM [VoicesSetsTable] " +
-                                         $@"WHERE [HostHashCode] = '{s_hashcode}';", true, false, false);
-                                    for (int vsi = 0; vsi < b_item.VoicePairList.Count; vsi++)
-                                    {
-                                        M_Connection.ExecuteNonQuery(
-                                             @"INSERT INTO [VoicesSetsTable] " +
-                                              $@"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
-                                              $@"'{b_item.VoicePairList[vsi].VoiceName}', " +
-                                              $@"'{b_item.VoicePairList[vsi].VoiceText}', " +
-                                              $@"'{s_hashcode}');", true, false, false);
-                                        //++++++++++++++++++++
-                                        ScoreLibrary[w_index].VoicePairList = b_item.VoicePairList;
-                                    }
-                                }
-                                if (!String.IsNullOrEmpty(b_item.FullName))
-                                {
-                                    ScoreLibrary[w_index].FullName = b_item.FullName;
-                                }
-                                if (!String.IsNullOrEmpty(b_item.HeaderName))
-                                {
-                                    ScoreLibrary[w_index].HeaderName = b_item.HeaderName;
+                                         @"INSERT INTO [VoicesSetsTable] " +
+                                          $@"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
+                                          $@"'{b_item.VoicePairList[vsi].VoiceName}', " +
+                                          $@"'{b_item.VoicePairList[vsi].VoiceText}', " +
+                                          $@"'{s_hashcode}');", true, false, false);
                                 }
                             }
-                            break;
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Ошибка { ex.Message}. Работа программы остановлена.",
+                                      "Ошибка обновления списка инструментов при обновлении произведения в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return false;
+                            }
+                            ScoreLibrary[w_index].VoicePairList = b_item.VoicePairList;
                         }
-                    case 1:     //  Insert
+                        if (!String.IsNullOrEmpty(b_item.FullName))
                         {
-                            ExceptionMessageBoxHeader = "Ошибка добавления произведения в базу данных.";
-                            int _hashcode = GI.GenerateHashCode();
+                            ScoreLibrary[w_index].FullName = b_item.FullName;
+                        }
+                        if (!String.IsNullOrEmpty(b_item.HeaderName))
+                        {
+                            ScoreLibrary[w_index].HeaderName = b_item.HeaderName;
+                        }
+                        break;
+                    }
+                    //================================================================================================
+                case 1:     //  Insert
+                    {
+                        try
+                        {
                             M_Connection.ExecuteNonQuery(
-                                @"INSERT INTO [WorksTable] " +
-                                        @"([HashCode], [FullName], [HeaderName], [Modified]) VALUES " +
-                                        $@"('{_hashcode.ToString()}', " +
-                                        $@"'{b_item.FullName}', " +
-                                        $@"'{b_item.HeaderName}', " +
-                                        $@"'{_modified.ToString(StandardDateTimeFormat)}');", true, false, false);
-                            if (b_item.VoicePairList.Count > 0)
+                            @"INSERT INTO [WorksTable] " +
+                                    @"([HashCode], [FullName], [HeaderName], [Modified]) VALUES " +
+                                    $@"('{b_item.HashCode.ToString()}', " +
+                                    $@"'{b_item.FullName}', " +
+                                    $@"'{b_item.HeaderName}', " +
+                                    $@"'{_modified.ToString(StandardDateTimeFormat)}');", true, false, false);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Ошибка { ex.Message}. Работа программы остановлена.",
+                                      "Ошибка добавления произведения в базу данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return false;
+                        }                                                
+                        if (b_item.VoicePairList.Count > 0)
+                        {
+                            try
                             {
                                 for (int i_ins = 0; i_ins < b_item.VoicePairList.Count; i_ins++)
                                 {
@@ -440,48 +494,73 @@ namespace Parminox
                                         @"([VoiceName], [TextValue], [HostHashCode]) VALUES (" +
                                         $@"'{b_item.VoicePairList[i_ins].VoiceName}', " +
                                         $@"'{b_item.VoicePairList[i_ins].VoiceText}', " +
-                                        $@"'{_hashcode.ToString()}')", true, false, false);
+                                        $@"'{b_item.HashCode.ToString()}')", true, false, false);
                                 }
                             }
-                            ScoreLibrary.Add(new ScoreItem(_hashcode, b_item.FullName, b_item.HeaderName, b_item.VoicePairList));
-                            break;
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Ошибка { ex.Message}. Работа программы остановлена.",
+                                      "Ошибка обновления списка инструментов при добавлении произведения в базу данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return false;
+                            }                            
                         }
-                    case 2:    //  Delete
+                        ScoreLibrary.Add(new ScoreItem(b_item.HashCode, b_item.FullName, b_item.HeaderName, b_item.VoicePairList));
+                        break;
+                    }
+                    //================================================================================================
+                case 2:    //  Remove
+                    {
+                        int w_index = FindScoreByHashcode(b_item.HashCode);
+                        if (w_index < 0)
                         {
-                            ExceptionMessageBoxHeader = "Ошибка удаления произведения из базы данных.";
+                            MessageBox.Show($"Попытка удаления несуществующего произведения.\nСвяжитесь с разработчиком.\nРабота программы остановлена.",
+                                                      "Ошибка обновления данных произведения в базе данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return false;
+                        }
+
+                        try
+                        {
                             M_Connection.ExecuteNonQuery(
-                                @"DELETE FROM [WorksTable] " +
-                                @"WHERE rowid IN (SELECT rowid FROM [WorksTable] " +
-                                $@"WHERE [HashCode] = '{s_hashcode}' LIMIT 1);", true, false, false);
+                            @"DELETE FROM [WorksTable] " +
+                            @"WHERE rowid IN (SELECT rowid FROM [WorksTable] " +
+                            $@"WHERE [HashCode] = '{s_hashcode}' LIMIT 1);", true, false, false);
                             M_Connection.ExecuteNonQuery(
                                 @"DELETE FROM [VoicesSetsTable] " +
                                 $@"WHERE [HostHashCode] = '{s_hashcode}';", false, false, false);
-                            if (w_index >= 0)
-                            {
-                                ScoreLibrary.RemoveAt(w_index);
-                                RemovePhantomProjectItems();
-                            }
-                            break;
                         }
-                }   //  switch
-                //M_Connection.CommitTransaction();
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Ошибка { ex.Message}. Работа программы остановлена.",
+                                      "Ошибка удаления произведения из базы данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return false;
+                        }
+                        if (w_index >= 0)
+                        {
+                            ScoreLibrary.RemoveAt(w_index);
+                            RemovePhantomProjectItems();
+                        }
+                        break;
+                    }
+            }   //  switch
+            try
+            { 
                 M_Connection.CloseConnection();
-                return true;
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Ошибка { ex.Message}. Работа программы остановлена.",
-                          ExceptionMessageBoxHeader, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                         "Ошибка COMMIT TRANSACTION при записи изменений в базу данных.", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
+            return true;
         }
         //==============================================================================
         public static void RemovePhantomProjectItems()
         {
-            int gstroke;     // removing possibly deleted items
+            // removing possibly deleted items
             for (int dil = GI.ProjectList.Count - 1; dil >= 0; dil--)
             {
-                gstroke = GI.ProjectList[dil].Int_Value;
+                int gstroke = GI.ProjectList[dil].Int_Value;
                 if (gstroke == 0) continue;
                 gstroke = GI.ScoreLibrary.FindIndex(x => x.HashCode == gstroke);    // GI.FindScoreByHashcode(gstroke);
                 if (gstroke < 0) GI.ProjectList.RemoveAt(dil);
@@ -555,7 +634,7 @@ namespace Parminox
 
         public static int FindScoreByHashcode(int hashcode)
         {
-            return ScoreLibrary.FindIndex(x => x.HashCode == hashcode);
+            return ScoreLibrary.FindIndex(x => x.HashCode.Equals(hashcode));
         }
         //==================================================================
         public static bool FlushVoiceList(List<string> listcopy)
